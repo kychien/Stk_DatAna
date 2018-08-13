@@ -6,7 +6,8 @@ Sub StkEval():
     '   volume over the years.
     '
     '   2018 08 13 - Added in implementation to check for data across multiple worksheets.
-    '       Added in checks for IPO's.
+    '       Added in checks for IPO's. Fixed an error where the last ticker was not being accounted
+    '       for.
     '   2018 08 10 - Basic implementation for 1 sheet of data to analyze total volume, overall
     '       change for the year, and percentage change for a given ticker symbol.  Also tracks
     '       greatest percent increase and decrease as well as greatest total volume
@@ -40,14 +41,14 @@ Sub StkEval():
         pX = 1                                                      ' printout column
         oX = WorksheetFunction.Match("<open>", Range("1:1"), 0)     ' open column via match
         cX = WorksheetFunction.Match("<close>", Range("1:1"), 0)    ' close column via match
-        size = 0                                                    ' number of unique ticker symbols
+        size = 1                                                    ' number of unique ticker symbols
         tPos = 0                                                    ' array position tracker
         tCur = Cells(dY, tX)                                        ' current ticker symbol being analyzed
         gpi = 0                                                     ' array position of greatest % increase
         gpd = 0                                                     ' array position of greatest % decrease
         gtv = 0                                                     ' array position of greatest total volume
         notPublic = False                                           ' bool to check for IPO's
-        IPOs = 0                                                  ' counter for how many IPO's this year
+        IPOs = 0                                                    ' counter for how many IPO's this year
         
         '''''''''''''''''''''''''''''''''''''''''''''Need to add checks for failed matches for tX, vX, oX and cX in the future
     
@@ -59,11 +60,12 @@ Sub StkEval():
             End If
             dY = dY + 1
         Loop
-        MsgBox ("Found " + Str(size) + " different tickers!")
         
-        If (size < 1) Then                          'End routine if there is no appropriate data
+        If (dY = 2) Then                        'End routine if there is no appropriate data
             MsgBox ("No data to operate on!")
             Exit Sub
+        Else
+            MsgBox ("Found " + Str(size) + " different tickers!")
         End If
         
         
@@ -75,7 +77,7 @@ Sub StkEval():
         Cells(1, pX) = "Evaluation:"
         lAdr = Split(Cells(1, pX).Address(True, False), "$")(0)     'note output range column letters
         rAdr = Split(Cells(1, pX + 8).Address(True, False), "$")(0)
-        pX = pX + 1
+        pX = pX + 1                                                 'move remaining print past labels
         
         ReDim tSym(size)                            'Resize arrays appropriately
         ReDim tVol(size)
@@ -99,15 +101,23 @@ Sub StkEval():
                 
                 tVol(tPos) = tVol(tPos) + Cells(dY, vX) 'Aggregate volume
                 
-                If (notPublic) Then                       'Check for start of trading
-                    If (Cells(dY, oX) > 0) Then     'Could have used AND here, but it doesn't feel right
-                        tOpn(tPos) = Cells(dY, oX)  ' nested structure would make more sense for handling
-                        notPublic = False           ' more cases in case the data was formated differently?
-                        IPOs = IPOs + 1         '
+                If (notPublic) Then                     'Check for start of trading
+                    If (Cells(dY, oX) > 0) Then         'Could have used AND here, but it doesn't feel right
+                        tOpn(tPos) = Cells(dY, oX)      ' nested structure would make more sense for handling
+                        notPublic = False               ' more cases in case the data was formated differently?
+                        IPOs = IPOs + 1
                     End If
                 End If
-            Else
-                tCls(tPos) = Cells(dY - 1, cX)
+            End If
+            
+            '''''''''''''''''''''''''''''''''''''''''Print results if mismatch or out of tickers
+            If ((tCur <> tSym(tPos)) Or (Cells(dY + 1, tX) = "")) Then
+                
+                If (Cells(dY + 1, tX) = "") Then        'Closing position if last item in list
+                    tCls(tPos) = Cells(dY, cX)
+                Else
+                    tCls(tPos) = Cells(dY - 1, cX)      'Closing position if new ticker symbol
+                End If
                 
                 '''''''''''''''''''''''''''''''''''''Report ticker info before moving on
                 Cells(tPos + 2, pX) = tSym(tPos)
